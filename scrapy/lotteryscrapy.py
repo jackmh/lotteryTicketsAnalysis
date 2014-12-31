@@ -8,7 +8,6 @@
 #-------------------------------------------------------------------------------
 
 import threading
-import socket
 import requests, time
 from bs4 import BeautifulSoup
 import os
@@ -18,7 +17,7 @@ BaseDir = u'/home/jack/'
 
 logMutex = threading.Lock()
 userMutex = threading.Lock()
-ThreadNum = 8
+ThreadNum = 3
 
 class scrapyLottery:
     def __init__(self):
@@ -26,9 +25,9 @@ class scrapyLottery:
         self.user_agent = u'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36'
         self.headers = {u'User-Agent': self.user_agent}
         self.ProteinUrl = ''
-        self.timeout= 60
+        self.timeout= 15
         self.proxies = {}
-        self.errorLogFile = BaseDir + u'local/errorOfScrapyProteinGene.log'
+        self.errorLogFile = BaseDir + u'Workspaces/expPPI/log/errorOfScrapyProteinGene.log'
         self.lotteryDir = BaseDir + u'local/lotteryTickets'
         
     def setLotteryUrl(self, dateTime):
@@ -46,8 +45,9 @@ class scrapyLottery:
             warnInfo = '[%s]. requests is not Existed.\n' % (self.dateTime)
             self.writeErrorMsgIntoLog(warnInfo)
             return None
-        names_and_taxonomy = soup.find('div', class_='history-tab', id='his-tab')
+        names_and_taxonomy = soup.find('div', class_='history-tab')
         ##################################################
+        print names_and_taxonomy.prettify()
         # Protein Official Name
         SummaryProteinInfo = ""
         if names_and_taxonomy is not None:
@@ -57,8 +57,6 @@ class scrapyLottery:
             ####################################################################
             for classLb in classLabels:
                 TrCurContents = table.find('table', class_=classLb)
-                if (TrCurContents == None):
-                    continue
                 ## print table.prettify()
                 divProteinNames = TrCurContents.find('tbody')
             
@@ -82,6 +80,8 @@ class scrapyLottery:
                     SummaryProteinInfo += "\n"
             ##################################################
         else:
+            warnInfo = '[%s]. Warn Message. Non Existed.\n' % (self.dateTime)
+            self.writeErrorMsgIntoLog(warnInfo)
             return None
         return SummaryProteinInfo.strip()
     
@@ -96,20 +96,6 @@ class scrapyLottery:
             except requests.exceptions.Timeout as e:
                 # Maybe set up for a retry, or continue in a retry loop
                 time.sleep(3)
-                errorInfo = '[%s]. Error Message[%s]\n' % (self.lotteryUrl, e)
-                if (openUrlCount <= 5):
-                    print("[%d times][%s]Try again. [%s]" % (openUrlCount, self.getLotteryTime(), errorInfo))
-                    openUrlCount += 1
-                    continue
-                self.writeErrorMsgIntoLog(errorInfo)
-                # ---------------------
-                # raise ConnectionError(e) ConnectionError: Write into log file
-                # ---------------------
-                RequestFlag = False
-                pass
-            except socket.timeout as e:
-                # Maybe set up for a retry, or continue in a retry loop
-                time.sleep(2)
                 errorInfo = '[%s]. Error Message[%s]\n' % (self.lotteryUrl, e)
                 if (openUrlCount <= 5):
                     print("[%d times][%s]Try again. [%s]" % (openUrlCount, self.getLotteryTime(), errorInfo))
@@ -146,18 +132,6 @@ class scrapyLottery:
                 # ---------------------
                 RequestFlag = False
                 pass
-            except requests.exceptions.ConnectionError as e:
-                errorInfo = '[%s]. Error Message[%s]\n' % (self.lotteryUrl, e)
-                if (openUrlCount <= 5):
-                    print("[%d times][%s]Try again. [%s]" % (openUrlCount, self.getLotteryTime(), errorInfo))
-                    openUrlCount += 1
-                    continue
-                self.writeErrorMsgIntoLog(errorInfo)
-                # ---------------------
-                # raise ConnectionError(e) ConnectionError: Write into log file
-                # ---------------------
-                RequestFlag = False
-                pass
             else:
                 soup = BeautifulSoup(response.content)
                 return soup
@@ -179,12 +153,11 @@ class scrapyLottery:
             HeadLine = u"# 期号\t开奖号\t十位\t个位\t后三\n"
             proteinAllInfo = HeadLine + proteinAllInfo
             writeFilePath = self.lotteryDir + os.sep + self.dateTime
-            self.writeUserMsgIntoFile(proteinAllInfo.encode('utf-8'), writeFilePath, 'w')
+            print proteinAllInfo
+            #self.writeUserMsgIntoFile(proteinAllInfo.encode('utf-8'), writeFilePath, 'w')
             return proteinAllInfo
         else:
             resetLotterySet.add(lotteryDate)
-            warnInfo = '[%s]. Warn Message. Non Existed.\n' % (self.dateTime)
-            self.writeErrorMsgIntoLog(warnInfo)
         return None
     
     def writeErrorMsgIntoLog(self, errorInfo):
@@ -210,104 +183,43 @@ class scrapyLottery:
         if (os.path.exists(self.errorLogFile)):
             os.remove(self.errorLogFile)
 
-
-def ThreadRun(lotteryList, resetLotterySet):
-    threads = []
-    nloops = xrange(len(lotteryList))
-    for i in nloops:
-        scrapyPG = scrapyLottery()
-        t = threading.Thread(target=scrapyPG.getLotteryInfo, args=(lotteryList[i], resetLotterySet))
-        threads.append(t)
-        pass
-    for i in nloops:
-        threads[i].start()
-    for i in nloops:
-        threads[i].join()
-    pass
-
-def getAllLottery():
+def getAllLottery(srcFile):
     scrapyPG = scrapyLottery()
     scrapyPG.initAllData()
     
     '''2014-01-01_2014-01-01 TO 2014-11-30_2014-11-30'''
-    lotteryDateTimeList = []
-    BeginDateTime = DateTime(2014, 1, 1)
-    DateNum = 90
-    DeadLineDateTime = DateTime(2014, 1, 10)
+    BeginDateTime = DateTime(2012, 1, 25)
+    DeadLineDateTime = DateTime(2012, 1, 26)
     
     curDateTime = BeginDateTime
     resetLotterySet = set()
-    Flag = True
-    while Flag:
-        if curDateTime.getCurStrOfCurDayTime() == DeadLineDateTime.getCurStrOfCurDayTime():
-        #if DateNum == 0:
-            Flag = False
+    while curDateTime.getCurStrOfCurDayTime() != DeadLineDateTime.getCurStrOfCurDayTime():
         lotteryDateTime = curDateTime.getCurStrOfCurDayTime()
-        lotteryDateTimeList.append(lotteryDateTime)
-        if len(lotteryDateTimeList) > 0 and len(lotteryDateTimeList) % ThreadNum == 0:
-            processingFileStr = ''
-            for file1 in lotteryDateTimeList:
-                if (processingFileStr == ''):
-                    processingFileStr = file1
-                else:
-                    processingFileStr += ", " + file1
-            print("processing file: %s" % (processingFileStr))
-            ThreadRun(lotteryDateTimeList, resetLotterySet)
-            lotteryDateTimeList = []
-            pass
+        scrapyPG.getLotteryInfo(lotteryDateTime, resetLotterySet)
         curDateTime.increOneDay()
-        DateNum -= 1
         pass
-    
-    ## if s is not NULL, Finished it.
-    if len(lotteryDateTimeList) > 0:
-        ThreadRun(lotteryDateTimeList, resetLotterySet)
-        
+    ## keep saving the release lottery.
     if (len(resetLotterySet) > 0):
-        ## Try another chance.
-        lotteryDateTimeList = []
-        releaseLotterySet = set()
-        print "Try one time again."
+        AllInvalidProteins = "# lotteryDate"
+        processingFileStr = ''
         for lotteryDate in resetLotterySet:
-            lotteryDateTimeList.append(lotteryDate)
-            if len(lotteryDateTimeList) > 0 and len(lotteryDateTimeList) % ThreadNum == 0:
-                processingFileStr = ''
-                for file1 in lotteryDateTimeList:
-                    if (processingFileStr == ''):
-                        processingFileStr = file1
-                    else:
-                        processingFileStr += ", " + file1
-                print("processing file again: %s" % (processingFileStr))
-                ThreadRun(lotteryDateTimeList, releaseLotterySet)
-                lotteryDateTimeList = []
-                pass
+            AllInvalidProteins += "\n" + lotteryDate
+            processingFileStr += lotteryDate + ", "
             pass
-        if len(lotteryDateTimeList) > 0:
-            ThreadRun(lotteryDateTimeList, releaseLotterySet)
-            pass
-        
-        ## keep saving the release lottery.
-        if (len(releaseLotterySet) > 0):
-            AllInvalidProteins = "# lotteryDate"
-            processingFileStr = ''
-            for lotteryDate in releaseLotterySet:
-                AllInvalidProteins += "\n" + lotteryDate
-                if processingFileStr == '':
-                    processingFileStr = lotteryDate
-                else:
-                    processingFileStr += ", " + lotteryDate
-                pass
-            print("-"*20)
-            print("But release some error lottery: %s" % processingFileStr)
-            ## warnLogFile = BaseDir + u'Workspaces/expPPI/data/warningOfscrapyProteinGene.log'
-            warnLogFile = BaseDir + u'local/warningOfscrapylotteryInfo.log'
-            WriteConn = open(warnLogFile, 'w')
-            WriteConn.write(AllInvalidProteins)
-            WriteConn.close()
+        print("-"*20)
+        print("But release some error lottery: %s" % processingFileStr)
+        ## warnLogFile = BaseDir + u'Workspaces/expPPI/data/warningOfscrapyProteinGene.log'
+        warnLogFile = BaseDir + u'Workspaces/expPPI/data/warningOfscrapyProteinGene.log'
+        WriteConn = open(warnLogFile, 'w')
+        WriteConn.write(AllInvalidProteins)
+        WriteConn.close()
     print("Finished all lottery processing.\n")
 
 def main():
-    getAllLottery()
+    srcProteinFile = BaseDir + u'Workspaces/expPPI/data/UniqueProteinName_201108.intm'
+    #srcProteinFile = BaseDir + u'UniqueProteinName_201108.intm'
+    ##writeLogFile = BaseDir + u'Workspaces/expPPI/data/proteinGene_201108.intm'
+    getAllLottery(srcProteinFile)
 
     #scrapyPG = scrapyLottery()
     #lotteryDate = scrapyPG.getLotteryInfo("P30085") ## P62988 P30085 P03897 Q9UKV8 O95232
