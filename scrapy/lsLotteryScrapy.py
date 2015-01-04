@@ -3,7 +3,7 @@
 # Name:        scrapy
 # Purpose:
 # Author:      jack_mhdong
-# Created:     07-09-2014
+# Created:     12-23-2014
 # Copyright:   (c) jack_mhdong 2014
 #-------------------------------------------------------------------------------
 
@@ -231,15 +231,17 @@ def getAllLottery():
     
     '''2014-01-01_2014-01-01 TO 2014-11-30_2014-11-30'''
     lotteryDateTimeList = []
-    BeginDateTime = DateTime(2014, 1, 1)
+    BeginDateTime = DateTime(2013, 1, 1)
     DateNum = 90
-    DeadLineDateTime = DateTime(2014, 1, 10)
+    DeadLineDateTime = DateTime(2013, 12, 31)
     
     curDateTime = BeginDateTime
+    ISOTIMEFORMAT='%Y-%m-%d'
+    nowDateTime = DateTime(time.strftime(ISOTIMEFORMAT, time.localtime()))
     resetLotterySet = set()
     Flag = True
     while Flag:
-        if curDateTime.getCurStrOfCurDayTime() == DeadLineDateTime.getCurStrOfCurDayTime():
+        if curDateTime.getCurStrOfCurDayTime() == DeadLineDateTime.getCurStrOfCurDayTime() or curDateTime.getCurStrOfCurDayTime() == nowDateTime.getCurStrOfCurDayTime():
         #if DateNum == 0:
             Flag = False
         lotteryDateTime = curDateTime.getCurStrOfCurDayTime()
@@ -288,7 +290,7 @@ def getAllLottery():
         
         ## keep saving the release lottery.
         if (len(releaseLotterySet) > 0):
-            AllInvalidProteins = "# lotteryDate"
+            AllInvalidProteins = "# lotteryDate (Not existed)"
             processingFileStr = ''
             for lotteryDate in releaseLotterySet:
                 AllInvalidProteins += "\n" + lotteryDate
